@@ -1,5 +1,5 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *      
- * Copyright (c) 2010-2013, Silvio Peroni <essepuntato@gmail.com>
+ * Copyright (c) 2010-2017, Silvio Peroni <essepuntato@gmail.com>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@ package it.essepuntato.lode;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -45,6 +46,27 @@ public class SourceExtractor {
 	}
 
 	public String exec(URL url) throws IOException {
+		switch ( url.getProtocol() ) {
+			case "http":
+			case "https":
+				return execHttp( url );
+			case "file":
+				return execLocal( url );
+			default:
+				return execLocal( url );
+		}
+	}
+
+
+	private String execLocal( URL url ) throws IOException {
+		InputStream in = url.openStream();
+		byte[] data = new byte[ in.available() ];
+		in.read( data );
+		return new String( data );
+	}
+
+	public String execHttp(URL url) throws IOException {
+
 		String result = "";
 		String ex = "\n";
 
