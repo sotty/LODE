@@ -15,24 +15,19 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package it.essepuntato.lode;
 
-import com.clarkparsia.pellet.owlapiv3.PelletReasoner;
-import com.clarkparsia.pellet.owlapiv3.PelletReasonerFactory;
-import org.coode.owlapi.rdf.rdfxml.RDFXMLOntologyStorerFactory;
-import org.mindswap.pellet.PelletOptions;
+import org.semanticweb.HermiT.Configuration;
+import org.semanticweb.HermiT.Reasoner;
 import org.semanticweb.owlapi.apibinding.OWLManager;
-import org.semanticweb.owlapi.io.RDFXMLOntologyFormat;
+import org.semanticweb.owlapi.formats.RDFXMLDocumentFormat;
 import org.semanticweb.owlapi.io.StringDocumentTarget;
 import org.semanticweb.owlapi.model.*;
+import org.semanticweb.owlapi.reasoner.OWLReasoner;
 import org.semanticweb.owlapi.util.*;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -41,12 +36,12 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.*;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
-import java.util.stream.Stream;
+
+;
 
 /**
  * Core implementation of the LODE OWL -> HTML transformation
@@ -174,7 +169,7 @@ public class LodeTransformer {
 					manager.addAxioms(ontology, importedOntology.getAxioms());
 				}
 			} else {
-				manager.setSilentMissingImportsHandling(true);
+				manager.getOntologyLoaderConfiguration().setMissingImportHandlingStrategy( MissingImportHandlingStrategy.SILENT );
 				ontology = manager.loadOntology(IRI.create(ontologyURL.toString()));
 			}
 
@@ -185,8 +180,7 @@ public class LodeTransformer {
 			StringDocumentTarget parsedOntology = new StringDocumentTarget();
 
 			// ensure storer is represent and registered
-			manager.addOntologyStorer( new RDFXMLOntologyStorerFactory().createStorer() );
-			manager.saveOntology(ontology, new RDFXMLOntologyFormat(), parsedOntology);
+			manager.saveOntology( ontology, new RDFXMLDocumentFormat(), parsedOntology );
 
 			result = parsedOntology.toString();
 		}
@@ -274,9 +268,8 @@ public class LodeTransformer {
 
 	private OWLOntology parseWithReasoner(OWLOntologyManager manager, OWLOntology ontology) {
 		try {
-			PelletOptions.load(new URL("http://" + cssLocation + "pellet.properties"));
-			PelletReasoner reasoner = PelletReasonerFactory.getInstance().createReasoner(ontology);
-			reasoner.getKB().prepare();
+			OWLReasoner reasoner = new Reasoner( new Configuration(), ontology );
+
 			List<InferredAxiomGenerator<? extends OWLAxiom>> generators = new ArrayList<InferredAxiomGenerator<? extends OWLAxiom>>();
 			generators.add(new InferredSubClassAxiomGenerator());
 			generators.add(new InferredClassAssertionAxiomGenerator());
@@ -297,27 +290,27 @@ public class LodeTransformer {
 
 			Map<OWLEntity, Set<OWLAnnotationAssertionAxiom>> entityAnnotations = new HashMap<OWLEntity, Set<OWLAnnotationAssertionAxiom>>();
 			for (OWLClass aEntity : ontology.getClassesInSignature()) {
-				entityAnnotations.put(aEntity, aEntity.getAnnotationAssertionAxioms(ontology));
+				entityAnnotations.put(aEntity, ontology.getAnnotationAssertionAxioms( aEntity.getIRI()));
 			}
 			for (OWLObjectProperty aEntity : ontology.getObjectPropertiesInSignature()) {
-				entityAnnotations.put(aEntity, aEntity.getAnnotationAssertionAxioms(ontology));
+				entityAnnotations.put(aEntity, ontology.getAnnotationAssertionAxioms( aEntity.getIRI()));
 			}
 			for (OWLDataProperty aEntity : ontology.getDataPropertiesInSignature()) {
-				entityAnnotations.put(aEntity, aEntity.getAnnotationAssertionAxioms(ontology));
+				entityAnnotations.put(aEntity, ontology.getAnnotationAssertionAxioms( aEntity.getIRI()));
 			}
 			for (OWLNamedIndividual aEntity : ontology.getIndividualsInSignature()) {
-				entityAnnotations.put(aEntity, aEntity.getAnnotationAssertionAxioms(ontology));
+				entityAnnotations.put(aEntity, ontology.getAnnotationAssertionAxioms( aEntity.getIRI()));
 			}
 			for (OWLAnnotationProperty aEntity : ontology.getAnnotationPropertiesInSignature()) {
-				entityAnnotations.put(aEntity, aEntity.getAnnotationAssertionAxioms(ontology));
+				entityAnnotations.put(aEntity, ontology.getAnnotationAssertionAxioms( aEntity.getIRI()));
 			}
 			for (OWLDatatype aEntity : ontology.getDatatypesInSignature()) {
-				entityAnnotations.put(aEntity, aEntity.getAnnotationAssertionAxioms(ontology));
+				entityAnnotations.put(aEntity, ontology.getAnnotationAssertionAxioms( aEntity.getIRI()));
 			}
 
 			manager.removeOntology(ontology);
 			OWLOntology inferred = manager.createOntology(id);
-			iog.fillOntology(manager, inferred);
+			iog.fillOntology(manager.getOWLDataFactory(), inferred);
 
 			for (OWLImportsDeclaration decl : declarations) {
 				manager.applyChange(new AddImport(inferred, decl));
@@ -345,12 +338,6 @@ public class LodeTransformer {
 			}
 
 			return inferred;
-		} catch (FileNotFoundException e1) {
-			return ontology;
-		} catch (MalformedURLException e1) {
-			return ontology;
-		} catch (IOException e1) {
-			return ontology;
 		} catch (OWLOntologyCreationException e) {
 			return ontology;
 		}
