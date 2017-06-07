@@ -30,9 +30,9 @@ import org.mortbay.jetty.webapp.WebAppContext;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 
-import static com.ibm.icu.impl.Assert.fail;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class LodeDeployWithRemoteOntologyTest {
 
