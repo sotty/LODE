@@ -15,6 +15,9 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package it.essepuntato.lode;
 
+import org.protege.xmlcatalog.CatalogUtilities;
+import org.protege.xmlcatalog.XMLCatalog;
+import org.protege.xmlcatalog.owlapi.XMLCatalogIRIMapper;
 import org.semanticweb.HermiT.Configuration;
 import org.semanticweb.HermiT.Reasoner;
 import org.semanticweb.owlapi.apibinding.OWLManager;
@@ -36,7 +39,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.*;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
@@ -64,10 +66,20 @@ public class LodeTransformer {
 
 
 	public String transform( URL ontologyURL ) throws TransformerException, OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException, IOException {
-		return transform( ontologyURL, "en", false, false, false, false );
+		return transform( ontologyURL, null, "en", false, false, false, false );
 	}
 
 	public String transform( URL ontologyURL,
+	                        String lang,
+	                        boolean useOWLAPI,
+	                        boolean considerImportedOntologies,
+	                        boolean considerImportedClosure,
+	                        boolean useReasoner ) throws OWLOntologyStorageException, URISyntaxException, IOException, OWLOntologyCreationException, TransformerException {
+		return transform( ontologyURL, Optional.empty(), lang, useOWLAPI, considerImportedOntologies, considerImportedClosure, useReasoner  );
+	}
+
+	public String transform( URL ontologyURL,
+	                         Optional<URL> catalogURL,
 	                         String lang,
 	                         boolean useOWLAPI,
 	                         boolean considerImportedOntologies,
@@ -81,7 +93,7 @@ public class LodeTransformer {
 		}
 
 		if ( useOWLAPI ) {
-			content = parseWithOWLAPI( ontologyURL, useOWLAPI, considerImportedOntologies, considerImportedClosure, useReasoner );
+			content = parseWithOWLAPI( ontologyURL, catalogURL, useOWLAPI, considerImportedOntologies, considerImportedClosure, useReasoner );
 		} else {
 			SourceExtractor extractor = new SourceExtractor();
 			extractor.addMimeTypes( MimeType.mimeTypes );
@@ -146,6 +158,7 @@ public class LodeTransformer {
 	 */
 
 	private String parseWithOWLAPI( URL ontologyURL,
+	                                Optional<URL> catalogURL,
 	                                boolean useOWLAPI,
 	                                boolean considerImportedOntologies,
 	                                boolean considerImportedClosure,
@@ -154,6 +167,20 @@ public class LodeTransformer {
 
 		if (useOWLAPI) {
 			OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+
+			//FIXME OWL-API v5.1.0 does not support JAR sources. Remove if/when feature is added
+			final OWLOntologyFactory defaultFactory = manager.getOntologyFactories().iterator().next();
+			manager.getOntologyFactories().set( defaultFactory, new JarOntologyFactory( defaultFactory, catalogURL ) );
+
+			try {
+				if ( catalogURL.isPresent() ) {
+					XMLCatalog catalog = CatalogUtilities.parseDocument( catalogURL.get() );
+					XMLCatalogIRIMapper mapper = new XMLCatalogIRIMapper( catalog );
+					manager.setIRIMappers( Collections.<OWLOntologyIRIMapper>singleton( mapper ) );
+				}
+			} catch ( IOException ioe ) {
+				ioe.printStackTrace();
+			}
 			
 			OWLOntology ontology = null;
 

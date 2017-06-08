@@ -43,8 +43,14 @@
 		<dependency>
 			<groupId>net.sourceforge.owlapi</groupId>
 			<artifactId>owlapi-distribution</artifactId>
-			<version>4.2.8</version>
+			<version>5.1.0</version>
 		</dependency>
+
+        <dependency>
+            <groupId>edu.stanford.protege</groupId>
+            <artifactId>org.protege.xmlcatalog</artifactId>
+            <version>1.0.5</version>
+        </dependency>
 
 		<!-- servlets -->
 		<dependency>
@@ -106,8 +112,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.1</version>
 				<configuration>
-					<source>1.7</source>
-					<target>1.7</target>
+					<source>1.8</source>
+					<target>1.8</target>
 				</configuration>
 			</plugin>
 
