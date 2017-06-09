@@ -24,6 +24,7 @@ import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.formats.RDFXMLDocumentFormat;
 import org.semanticweb.owlapi.io.StringDocumentTarget;
 import org.semanticweb.owlapi.model.*;
+import org.semanticweb.owlapi.model.parameters.Imports;
 import org.semanticweb.owlapi.reasoner.OWLReasoner;
 import org.semanticweb.owlapi.util.*;
 import org.w3c.dom.Document;
@@ -42,6 +43,8 @@ import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 ;
 
@@ -66,7 +69,7 @@ public class LodeTransformer {
 
 
 	public String transform( URL ontologyURL ) throws TransformerException, OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException, IOException {
-		return transform( ontologyURL, null, "en", false, false, false, false );
+		return transform( ontologyURL, Optional.empty(), "en", false, false, false, false );
 	}
 
 	public String transform( URL ontologyURL,
@@ -85,15 +88,26 @@ public class LodeTransformer {
 	                         boolean considerImportedOntologies,
 	                         boolean considerImportedClosure,
 	                         boolean useReasoner ) throws TransformerException, OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException, IOException {
+		return transform( ontologyURL, catalogURL, lang, useOWLAPI, considerImportedOntologies, considerImportedClosure, useReasoner, true );
+	}
+
+	public String transform( URL ontologyURL,
+	                         Optional<URL> catalogURL,
+	                         String lang,
+	                         boolean useOWLAPI,
+	                         boolean considerImportedOntologies,
+	                         boolean considerImportedClosure,
+	                         boolean useReasoner,
+	                         boolean deepImport ) throws TransformerException, OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException, IOException {
 
 		String content;
 
-		if ( considerImportedOntologies || considerImportedClosure || useReasoner ) {
+		if ( considerImportedOntologies || considerImportedClosure || useReasoner || deepImport ) {
 			useOWLAPI = true;
 		}
 
 		if ( useOWLAPI ) {
-			content = parseWithOWLAPI( ontologyURL, catalogURL, useOWLAPI, considerImportedOntologies, considerImportedClosure, useReasoner );
+			content = parseWithOWLAPI( ontologyURL, catalogURL, useOWLAPI, considerImportedOntologies, considerImportedClosure, useReasoner, deepImport );
 		} else {
 			SourceExtractor extractor = new SourceExtractor();
 			extractor.addMimeTypes( MimeType.mimeTypes );
@@ -162,7 +176,8 @@ public class LodeTransformer {
 	                                boolean useOWLAPI,
 	                                boolean considerImportedOntologies,
 	                                boolean considerImportedClosure,
-	                                boolean useReasoner ) throws OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException {
+	                                boolean useReasoner,
+	                                boolean deepImport ) throws OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException {
 		String result = "";
 
 		if (useOWLAPI) {
@@ -185,16 +200,23 @@ public class LodeTransformer {
 			OWLOntology ontology = null;
 
 			if (considerImportedClosure || considerImportedOntologies) {
-				ontology = manager.loadOntology(IRI.create(ontologyURL.toString()));
-				Set<OWLOntology> setOfImportedOntologies = new HashSet<OWLOntology>();
-				if (considerImportedOntologies) {
-					setOfImportedOntologies.addAll(ontology.getDirectImports());
-				} else {
-					setOfImportedOntologies.addAll(ontology.getImportsClosure());
-				}
-				for (OWLOntology importedOntology : setOfImportedOntologies) {
-					manager.addAxioms(ontology, importedOntology.getAxioms());
-				}
+				final OWLOntology onto = manager.loadOntology(IRI.create(ontologyURL.toString()));
+
+				Stream<OWLOntology> parentOntologies = considerImportedOntologies ? onto.directImports() : onto.importsClosure();
+				parentOntologies.forEach( (parent) -> {
+					if ( deepImport ) {
+						onto.addAxioms( parent.axioms() );
+					} else {
+						Set<OWLAxiom> collector = new HashSet<>();
+						onto.signature( Imports.EXCLUDED ).forEach( (owlEntity) -> {
+							collector.addAll( parent.declarationAxioms( owlEntity ).collect( Collectors.toSet() ) );
+							collector.addAll( onto.annotationAssertionAxioms( owlEntity.getIRI(), Imports.INCLUDED ).collect( Collectors.toSet() ) );
+						} );
+						onto.add( collector );
+					}
+				} );
+
+				ontology = onto;
 			} else {
 				manager.getOntologyLoaderConfiguration().setMissingImportHandlingStrategy( MissingImportHandlingStrategy.SILENT );
 				ontology = manager.loadOntology(IRI.create(ontologyURL.toString()));

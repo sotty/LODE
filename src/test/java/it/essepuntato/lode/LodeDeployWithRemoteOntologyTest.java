@@ -64,7 +64,6 @@ public class LodeDeployWithRemoteOntologyTest {
 			Document html = Jsoup.parse( is, Charset.defaultCharset().name(), "http://localhost:8080/lode" );
 
 			String title = html.title();
-			System.out.println( title );
 			assertTrue( title.contains( "PROV-O" ) );
 		} catch ( Exception e ) {
 			fail( e.getMessage() );

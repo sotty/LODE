@@ -18,14 +18,17 @@ package it.essepuntato.lode;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.Test;
+import org.semanticweb.owlapi.model.OWLOntologyCreationException;
+import org.semanticweb.owlapi.model.OWLOntologyStorageException;
 
+import javax.xml.transform.TransformerException;
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.util.Optional;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class LodeComponentTest {
 
@@ -47,9 +50,9 @@ public class LodeComponentTest {
 			Document html = Jsoup.parse( output );
 
 			String title = html.title();
-			System.out.println( title );
 			assertTrue( title.contains( "PROV-O" ) );
 		} catch ( Exception e ) {
+			e.printStackTrace();
 			fail( e.getMessage() );
 		}
 	}
@@ -66,8 +69,59 @@ public class LodeComponentTest {
 			Document html = Jsoup.parse( output );
 
 			String title = html.title();
-			System.out.println( title );
 			assertTrue( title.contains( "PROV-O" ) );
+		} catch ( Exception e ) {
+			fail( e.getMessage() );
+		}
+	}
+
+	@Test
+	public void testShallowImports() {
+
+		URL onto2 = Thread.currentThread().getContextClassLoader().getResource( "lower.owl" );
+		URL catlg = Thread.currentThread().getContextClassLoader().getResource( "catalog-v001.xml" );
+
+		LodeTransformer transformer = new LodeTransformer( LodeTransformer.resolveDefaultXLS(), LodeTransformer.resolveDefaultCSS() );
+
+		try {
+			String output = transformer.transform( onto2,
+			                                       Optional.of( catlg ),
+			                                       "en",
+			                                       true,
+			                                       true,
+			                                       true,
+			                                       false,
+			                                       true );
+
+			assertTrue( output.contains( "This is A" ) );
+			assertTrue( output.contains( "This is B" ) );
+			assertTrue( output.contains( "This is C" ) );
+			assertTrue( output.contains( "This is D" ) );
+			assertTrue( output.contains( "This is E" ) );
+			assertTrue( output.contains( "<span class=\"logic\">and</span>" ) );
+
+		} catch ( Exception e ) {
+			e.printStackTrace();
+			fail( e.getMessage() );
+		}
+
+		try {
+			String output = transformer.transform( onto2,
+			                                       Optional.of( catlg ),
+			                                       "en",
+			                                       true,
+			                                       true,
+			                                       true,
+			                                       false,
+			                                       false );
+
+			assertFalse( output.contains( "This is A" ) );
+			assertFalse( output.contains( "This is B" ) );
+			assertTrue( output.contains( "This is C" ) );
+			assertTrue( output.contains( "This is D" ) );
+			assertFalse( output.contains( "This is E" ) );
+			assertFalse( output.contains( "<span class=\"logic\">and</span>" ) );
+
 		} catch ( Exception e ) {
 			fail( e.getMessage() );
 		}
