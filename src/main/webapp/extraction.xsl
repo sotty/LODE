@@ -1683,7 +1683,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
         <xsl:if test="not(starts-with($iri,'_:'))">
             <xsl:variable name="iriNew" select="if (contains($iri,'#') or contains($iri,'/')) then $iri else concat(base-uri($root), $iri)" as="xs:string" />
             
-            <xsl:variable name="ns" select="if (contains($iriNew,'#')) then substring($iriNew,1,f:string-first-index-of($iriNew,'#')) else substring($iriNew,1,f:string-last-index-of(replace($iriNew,'://','---'),'/'))" as="xs:string" />
+            <xsl:variable name="ns" select="if (contains($iriNew,'#')) then substring($iriNew,1,f:string-first-index-of($iriNew,'#')) else ( if(contains($iriNew,'/')) then substring($iriNew,1,f:string-last-index-of(replace($iriNew,'://','---'),'/')) else substring($iriNew,1,f:string-last-index-of($iriNew,':')) )" as="xs:string" />
             
             <xsl:variable name="index" select="index-of($prefixes-uris,$ns)[1]" as="xs:integer?" />
             <xsl:if test="exists($index)">
