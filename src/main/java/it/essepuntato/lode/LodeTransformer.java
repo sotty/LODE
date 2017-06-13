@@ -61,12 +61,26 @@ public class LodeTransformer {
 	private String xsltURL = defaultXsltURL;
 	private String cssLocation = defaultCssLocation;
 
+	private Optional<URIResolver> resolver = Optional.empty();
+
 
 	public LodeTransformer( String xsltURL, String cssLocation ) {
-		this.xsltURL = xsltURL;
-		this.cssLocation = cssLocation;
+		this( xsltURL, cssLocation, Optional.empty() );
 	}
 
+	public LodeTransformer( String xsltURL, String cssLocation, Optional<URIResolver> resolver ) {
+		this.xsltURL = xsltURL;
+		this.cssLocation = cssLocation;
+		setResolver( resolver );
+	}
+
+	public Optional<URIResolver> getResolver() {
+		return resolver;
+	}
+
+	public void setResolver( Optional<URIResolver> resolver ) {
+		this.resolver = resolver;
+	}
 
 	public String transform( URL ontologyURL ) throws TransformerException, OWLOntologyCreationException, OWLOntologyStorageException, URISyntaxException, IOException {
 		return transform( ontologyURL, Optional.empty(), "en", false, false, false, false );
@@ -402,11 +416,15 @@ public class LodeTransformer {
 	}
 
 	private String applyXSLTTransformation( String source, String ontologyUrl, String lang ) throws TransformerException, IOException {
-		TransformerFactory tfactory = new net.sf.saxon.TransformerFactoryImpl();
-
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		StreamSource ss = new StreamSource( xsltURL );
 
-		Transformer transformer = tfactory.newTransformer( new StreamSource( xsltURL ) );
+		TransformerFactory tf = TransformerFactory.newInstance();
+		if ( resolver.isPresent() ) {
+			tf.setURIResolver( resolver.get() );
+		}
+		Templates templ = tf.newTemplates( ss );
+		Transformer transformer = templ.newTransformer();
 
 		transformer.setParameter("css-location", cssLocation);
 		transformer.setParameter("lang", lang);
